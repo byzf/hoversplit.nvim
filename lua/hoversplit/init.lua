@@ -93,10 +93,56 @@ local function req_update()
   )
 end
 
+local function open()
+  if not is_valid() then
+    hover_bufnr = vim.api.nvim_create_buf(false, true)
+    vim.api.nvim_buf_set_name(hover_bufnr, "hoversplit")
+    vim.api.nvim_buf_set_var(hover_bufnr, "is_lsp_hover_split", true)
+
+    local opts = { buf = hover_bufnr }
+    vim.api.nvim_set_option_value("bufhidden", "hide", opts)
+    vim.api.nvim_set_option_value("modifiable", false, opts)
+
+  end
+
+  local wopts = config.winconfig
+  if wopts.split == 'below' or wopts.split == 'top' then
+    local h = math.floor(
+      vim.api.nvim_win_get_height(0) * config.max_size
+    )
+    wopts.height = math.min(h, wopts.height)
+  else
+    local w = math.floor(
+      vim.api.nvim_win_get_width(0) * config.max_size
+    )
+    wopts.width = math.min(w, wopts.width)
+  end
+  hover_winid = vim.api.nvim_open_win(hover_bufnr, false, wopts)
+  vim.wo[hover_winid].foldenable = false
+  vim.wo[hover_winid].breakindent = true
+  vim.wo[hover_winid].smoothscroll = true
+
+  if config.autoclose then
+    invoked_buf = vim.api.nvim_get_current_buf()
+    local augroup = vim.api.nvim_create_augroup(agname, { clear = true })
+    vim.api.nvim_create_autocmd({'BufEnter'}, {
+      callback = function(ev)
+        if ev.buf == invoked_buf then
+          return
+        elseif ev.buf == hover_bufnr then
+          return
+        else
+          close()
+        end
+      end,
+      group=augroup
+    })
+  end
+end
 
 function M.show()
 	if not is_shown() then
-		M.toggle()
+		open()
 	end
   req_update()
 end
@@ -107,50 +153,8 @@ end
 
 function M.toggle()
 	if not close() then
-    if not is_valid() then
-      hover_bufnr = vim.api.nvim_create_buf(false, true)
-      vim.api.nvim_buf_set_name(hover_bufnr, "hoversplit")
-      vim.api.nvim_buf_set_var(hover_bufnr, "is_lsp_hover_split", true)
-
-      local opts = { buf = hover_bufnr }
-      vim.api.nvim_set_option_value("bufhidden", "hide", opts)
-      vim.api.nvim_set_option_value("modifiable", false, opts)
-
-    end
-
-    local wopts = config.winconfig
-    if wopts.split == 'below' or wopts.split == 'top' then
-      local h = math.floor(
-        vim.api.nvim_win_get_height(0) * config.max_size
-      )
-      wopts.height = math.min(h, wopts.height)
-    else
-      local w = math.floor(
-        vim.api.nvim_win_get_width(0) * config.max_size
-      )
-      wopts.width = math.min(w, wopts.width)
-    end
-    hover_winid = vim.api.nvim_open_win(hover_bufnr, false, wopts)
-    vim.wo[hover_winid].foldenable = false
-    vim.wo[hover_winid].breakindent = true
-    vim.wo[hover_winid].smoothscroll = true
-
-    if config.autoclose then
-      invoked_buf = vim.api.nvim_get_current_buf()
-      local augroup = vim.api.nvim_create_augroup(agname, { clear = true })
-      vim.api.nvim_create_autocmd({'BufEnter'}, {
-        callback = function(ev)
-          if ev.buf == invoked_buf then
-            return
-          elseif ev.buf == hover_bufnr then
-            return
-          else
-            close()
-          end
-        end,
-        group=augroup
-      })
-    end
+    open()
+    req_update()
   end
 end
 
